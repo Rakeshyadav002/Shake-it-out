@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shake It Out</title>
+<style>
+  :root{--bg1:#070d33;--bg2:#101b5c;--ink:#cfd8ff;--dim:#5d6aa8;--glow:#8fa6ff}
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:radial-gradient(ellipse at 50% 30%,var(--bg2),var(--bg1) 70%);color:var(--ink);
+    font-family:ui-monospace,Menlo,Consolas,monospace;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:28px;padding:24px;text-align:center;overflow:hidden;
+    padding-top:max(24px,env(safe-area-inset-top));padding-bottom:max(24px,env(safe-area-inset-bottom))}
+  h1{font-size:1.5rem;letter-spacing:.12em;margin:0;font-weight:600}
+  p{margin:0;color:var(--dim);font-size:.95rem;max-width:30ch;line-height:1.5}
+  #flag{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;max-width:92vw;min-height:52px}
+  .slot{width:1.5rem;height:2.4rem;border-bottom:2px solid var(--dim);font-size:1.7rem;line-height:2.4rem;
+    color:var(--ink);transition:transform .25s,color .25s,text-shadow .25s}
+  .slot.on{border-color:var(--glow);text-shadow:0 0 12px var(--glow);animation:pop .3s}
+  @keyframes pop{0%{transform:translateY(-8px) scale(1.4)}100%{transform:none}}
+  button{background:transparent;border:1.5px solid var(--glow);color:var(--ink);padding:12px 26px;
+    border-radius:999px;font:inherit;font-size:1rem;letter-spacing:.08em}
+  button:active{background:rgba(143,166,255,.18)}
+  #msg{min-height:1.4em;font-size:.85rem;color:var(--dim)}
+  body.shaking{animation:jit .18s}
+  @keyframes jit{25%{transform:translate(-4px,2px)}75%{transform:translate(4px,-2px)}}
+</style>
+</head>
+<body>
+  <h1>SHAKE IT OUT</h1>
+  <p>The flag is in here somewhere. It only comes out when you mean it.</p>
+  <div id="flag"></div>
+  <button id="go">START</button>
+  <div id="msg"></div>
+<script>
+(function(){
+  "use strict";
+  var ENC = [84, 74, 99, 87, 64, 82, 117, 35, 124, 9, 108, 16, 22];
+  var wrap = document.getElementById("flag"), msg = document.getElementById("msg"), btn = document.getElementById("go");
+  var slots = [], shown = 0, lastT = 0, lx = null, ly = null, lz = null, gotEvent = false;
+
+  for (var i = 0; i < ENC.length; i++) {
+    var s = document.createElement("div"); s.className = "slot"; s.textContent = "\u00a0";
+    wrap.appendChild(s); slots.push(s);
+  }
+
+  function reveal() {
+    if (shown >= ENC.length) return;
+    var ch = String.fromCharCode(ENC[shown] ^ ((shown * 7 + 23) & 255));
+    slots[shown].textContent = ch; slots[shown].className = "slot on";
+    shown++;
+    if (navigator.vibrate) { try { navigator.vibrate(35); } catch (e) {} }
+    document.body.classList.remove("shaking"); void document.body.offsetWidth; document.body.classList.add("shaking");
+    msg.textContent = shown >= ENC.length ? "That's everything." : "";
+  }
+
+  function onMotion(e) {
+    gotEvent = true;
+    var a = e.accelerationIncludingGravity || e.acceleration;
+    if (!a || a.x == null) return;
+    if (lx !== null) {
+      var d = Math.abs(a.x - lx) + Math.abs(a.y - ly) + Math.abs(a.z - lz);
+      var now = Date.now();
+      if (d > 28 && now - lastT > 380) { lastT = now; reveal(); }
+    }
+    lx = a.x; ly = a.y; lz = a.z;
+  }
+
+  function start() {
+    btn.style.display = "none";
+    function listen() {
+      window.addEventListener("devicemotion", onMotion);
+      msg.textContent = "Listening...";
+      setTimeout(function () {
+        if (!gotEvent) msg.textContent = "No motion sensor found. Use a phone, over HTTPS.";
+      }, 3000);
+    }
+    if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
+      DeviceMotionEvent.requestPermission().then(function (r) {
+        if (r === "granted") listen(); else { msg.textContent = "Motion permission denied."; btn.style.display = ""; }
+      }).catch(function () { msg.textContent = "Could not ask for motion permission."; btn.style.display = ""; });
+    } else { listen(); }
+  }
+  btn.addEventListener("click", start);
+
+  // TEST MODE: open the page with #test and tap anywhere to reveal. Delete this line before hosting.
+  if (location.hash === "#test") document.body.addEventListener("click", reveal);
+})();
+</script>
+</body>
+</html>
